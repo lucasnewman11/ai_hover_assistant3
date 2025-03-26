@@ -795,31 +795,6 @@ function setupAudioVisualization() {
   // Clear existing bars
   audioVisualization.innerHTML = '';
   
-  // Add control buttons
-  const muteButton = document.createElement('button');
-  muteButton.id = 'muteRecordingButton';
-  muteButton.className = 'audio-control-button';
-  muteButton.title = 'Mute microphone';
-  muteButton.innerHTML = `
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-      <line x1="8" y1="10" x2="16" y2="10"></line>
-    </svg>
-  `;
-
-  const stopButton = document.createElement('button');
-  stopButton.id = 'stopRecordingButton';
-  stopButton.className = 'audio-control-button';
-  stopButton.title = 'Stop recording and process';
-  stopButton.innerHTML = `
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="6" y="6" width="12" height="12" rx="1"></rect>
-    </svg>
-  `;
-  
-  audioVisualization.appendChild(muteButton);
-  audioVisualization.appendChild(stopButton);
-  
   // Create bars for visualization
   for (let i = 0; i < 50; i++) {
     const bar = document.createElement('div');
@@ -827,10 +802,6 @@ function setupAudioVisualization() {
     bar.style.height = '3px';
     audioVisualization.appendChild(bar);
   }
-  
-  // Add event listeners for the new buttons
-  stopButton.addEventListener('click', stopRecording);
-  muteButton.addEventListener('click', toggleMicrophoneMute);
 }
 
 // Update the audio visualization
@@ -841,10 +812,7 @@ function updateAudioVisualization() {
   const dataArray = new Uint8Array(bufferLength);
   analyser.getByteFrequencyData(dataArray);
   
-  // Get all bar elements - skip the buttons
-  const allElements = Array.from(audioVisualization.children);
-  const bars = allElements.filter(el => el.className === 'audio-bar');
-  
+  const bars = audioVisualization.children;
   const step = Math.floor(bufferLength / bars.length);
   
   for (let i = 0; i < bars.length; i++) {
