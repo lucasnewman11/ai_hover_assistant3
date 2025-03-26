@@ -29,11 +29,23 @@ function createAssistant() {
   header.appendChild(title);
   header.appendChild(closeButton);
   
+  // Get the current page content
+  const pageContent = document.body.innerText;
+  
   // Create iframe to load chat interface
   const iframe = document.createElement('iframe');
   iframe.id = 'claude-assistant-frame';
   iframe.src = chrome.runtime.getURL('chat.html');
   iframe.allow = "microphone; camera";
+  
+  // Set up message passing once iframe loads
+  iframe.onload = () => {
+    iframe.contentWindow.postMessage({
+      action: 'setPageContent',
+      content: pageContent
+    }, '*');
+    console.log("Sent page content to chat iframe");
+  };
   
   // Append elements
   container.appendChild(header);
@@ -94,6 +106,28 @@ function makeElementDraggable(element, handle) {
     document.onmousemove = null;
   }
 }
+
+// Listen for messages from the iframe
+window.addEventListener('message', function(event) {
+  // Only accept messages from our iframe
+  const iframe = document.getElementById('claude-assistant-frame');
+  if (!iframe || event.source !== iframe.contentWindow) return;
+  
+  console.log("Content script received message from iframe:", event.data);
+  
+  // If the iframe requests page content
+  if (event.data.action === 'getPageContent') {
+    const pageContent = document.body.innerText;
+    
+    // Send the page content back to the iframe
+    iframe.contentWindow.postMessage({
+      action: 'setPageContent',
+      content: pageContent
+    }, '*');
+    
+    console.log("Sent page content to chat iframe");
+  }
+});
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {

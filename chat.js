@@ -26,6 +26,7 @@ const bufferSizeValueSpan = document.getElementById('bufferSizeValue');
 let apiKey = null;
 let openaiApiKey = null;
 let claudeService = null;
+let pageContent = null;
 let messages = [
   { role: "assistant", content: "Hello! I'm Claude. How can I help you today?" }
 ];
@@ -593,10 +594,16 @@ async function sendMessage(content) {
       throw new Error('Failed to determine API authentication method');
     }
     
+    // Prepare system prompt with page content if available
+    let enhancedSystemPrompt = config.systemPrompt;
+    if (pageContent) {
+      enhancedSystemPrompt += `\n\nThe following is the content of the current webpage the user is viewing. Please use this information to help answer their questions:\n\n${pageContent}`;
+    }
+    
     // Add stream parameter for streaming responses
     const requestBody = {
       model: config.model,
-      system: config.systemPrompt,
+      system: enhancedSystemPrompt,
       messages: messageHistory,
       temperature: parseFloat(config.temperature),
       max_tokens: 4096,
@@ -1152,6 +1159,34 @@ speakButton.addEventListener('click', () => {
     updateStatus('Text-to-speech disabled');
   } else {
     updateStatus('Text-to-speech enabled');
+  }
+});
+
+// Handle page content capture button
+const capturePageButton = document.getElementById('capturePageButton');
+capturePageButton.addEventListener('click', () => {
+  // Request the page content from the parent window (content script)
+  window.parent.postMessage({ action: 'getPageContent' }, '*');
+  updateStatus('Requesting page content...');
+});
+
+// Listen for messages from the content script
+window.addEventListener('message', function(event) {
+  // We only accept messages from ourselves
+  if (event.source !== window.parent) return;
+  
+  console.log("Chat iframe received message:", event.data);
+  
+  if (event.data.action === 'setPageContent') {
+    pageContent = event.data.content;
+    console.log("Page content received and stored");
+    
+    // Update status to show page content was loaded
+    updateStatus("Page content loaded. You can ask questions about the current page.");
+    
+    // Add a system message indicating we have page content
+    const pageContentMsg = `I've loaded the content from the current webpage. Feel free to ask me questions about it.`;
+    addMessageToChat(pageContentMsg, 'assistant');
   }
 });
 
