@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" allow="microphone">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Conversation</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+    }
+    
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin: 10px 0;
+      font-size: 18px;
+    }
+    
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background-color: #fff;
+    }
+    
+    .message {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      max-width: 85%;
+      position: relative;
+      word-wrap: break-word;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .user-message {
+      align-self: flex-end;
+      background-color: #8C55FB;
+      color: white;
+      margin-left: auto;
+    }
+    
+    .assistant-message {
+      align-self: flex-start;
+      background-color: #e5e5ea;
+      color: #333;
+    }
+    
+    .message-text {
+      word-break: break-word;
+    }
+    
+    .message-speak-button {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(140, 85, 251, 0.2);
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s, background-color 0.2s;
+    }
+    
+    .assistant-message {
+      position: relative;
+    }
+    
+    .assistant-message:hover .message-speak-button {
+      opacity: 1;
+    }
+    
+    .message-speak-button:hover {
+      background: rgba(140, 85, 251, 0.5);
+    }
+    
+    .typing-indicator {
+      display: none;
+      padding: 8px 12px;
+      background-color: #e5e5ea;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      max-width: 80%;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+    
+    .typing-indicator span {
+      height: 8px;
+      width: 8px;
+      background-color: #999;
+      border-radius: 50%;
+      display: inline-block;
+      margin: 0 2px;
+    }
+    
+    .audio-visualization {
+      height: 60px;
+      background-color: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      display: none;
+    }
+    
+    .audio-bar {
+      width: 3px;
+      margin: 0 2px;
+      background-color: #8C55FB;
+      border-radius: 3px;
+    }
+    
+    .chat-input-container {
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-top: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+    }
+    
+    .chat-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 20px;
+      outline: none;
+      font-size: 14px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .send-button, .voice-button {
+      margin-left: 8px;
+      background-color: #8C55FB;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .send-button:hover, .voice-button:hover, .speak-button:hover {
+      background-color: #7040E0;
+    }
+    
+    .voice-button.recording {
+      background-color: #e74c3c;
+      animation: recording-pulse 1.5s infinite;
+    }
+    
+    .speak-button {
+      margin-left: 8px;
+      background-color: #8C55FB;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .speak-button.active {
+      background-color: #16a085;
+      animation: speaking-pulse 2s infinite;
+    }
+    
+    @keyframes recording-pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes speaking-pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    
+    .config-panel {
+      background-color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+      display: none;
+    }
+    
+    .config-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .config-item {
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 3px;
+      font-weight: bold;
+      color: #555;
+      font-size: 12px;
+    }
+    
+    select, input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    textarea {
+      width: 100%;
+      height: 60px;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      resize: vertical;
+    }
+    
+    .status-bar {
+      padding: 6px 10px;
+      background-color: #2c3e50;
+      color: white;
+      font-size: 12px;
+    }
+    
+    .toggle-config {
+      background: none;
+      border: none;
+      color: #8C55FB;
+      cursor: pointer;
+      padding: 4px;
+      font-size: 12px;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Claude Conversation</h1>
+    
+    <button id="toggleConfig" class="toggle-config">Configure</button>
+    
+    <div id="configPanel" class="config-panel">
+      <div class="config-row">
+        <div class="config-item">
+          <label for="modelSelect">Model:</label>
+          <select id="modelSelect">
+            <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
+            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+            <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="config-row">
+        <div class="config-item">
+          <label for="temperatureSlider">Temperature: <span id="temperatureValue">0.7</span></label>
+          <input type="range" id="temperatureSlider" min="0" max="1" step="0.1" value="0.7">
+        </div>
+      </div>
+      
+      <div class="config-row">
+        <div class="config-item">
+          <label for="systemPrompt">System Prompt:</label>
+          <textarea id="systemPrompt">You are Claude, a helpful AI assistant. Answer questions accurately and concisely.</textarea>
+        </div>
+      </div>
+      
+      <div class="config-row">
+        <div class="config-item">
+          <label for="openaiApiKey">OpenAI API Key (for speech services):</label>
+          <input type="password" id="openaiApiKey" placeholder="sk-...">
+        </div>
+      </div>
+      
+      <div class="config-row">
+        <div class="config-item">
+          <label for="ttsVoice">Text-to-Speech Voice:</label>
+          <select id="ttsVoice">
+            <option value="alloy">Alloy</option>
+            <option value="echo">Echo</option>
+            <option value="fable">Fable</option>
+            <option value="onyx">Onyx</option>
+            <option value="nova">Nova</option>
+            <option value="shimmer">Shimmer</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label for="ttsEnabled">
+            <input type="checkbox" id="ttsEnabled" checked>
+            Auto-speak responses
+          </label>
+        </div>
+      </div>
+      
+      <div class="config-row">
+        <div class="config-item">
+          <label for="useBrowserTts">
+            <input type="checkbox" id="useBrowserTts">
+            Use browser TTS (faster but lower quality)
+          </label>
+        </div>
+        <div class="config-item">
+          <label for="liveStreamMode">
+            <input type="checkbox" id="liveStreamMode" checked>
+            Stream audio in real-time
+          </label>
+        </div>
+      </div>
+      
+      <div class="config-row">
+        <div class="config-item">
+          <label for="streamingTtsBufferSize">Streaming chunk size (words):</label>
+          <input type="range" id="streamingTtsBufferSize" min="5" max="30" step="5" value="15">
+          <span id="bufferSizeValue">15</span>
+        </div>
+      </div>
+      
+      <button id="saveConfig" class="send-button" style="width: auto; border-radius: 4px; padding: 6px 12px; margin-top: 5px;">Save</button>
+    </div>
+    
+    <div class="chat-container">
+      <div id="chatMessages" class="chat-messages">
+        <div class="message assistant-message">
+          <div class="message-text">Hello! I'm Claude. How can I help you today?</div>
+        </div>
+        <div id="typingIndicator" class="typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+      
+      <div id="audioVisualization" class="audio-visualization"></div>
+      
+      <div class="chat-input-container">
+        <input type="text" id="chatInput" class="chat-input" placeholder="Type your message...">
+        <button id="voiceButton" class="voice-button" title="Record voice input">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+        </button>
+        <button id="speakButton" class="speak-button" title="Toggle text-to-speech">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        </button>
+        <button id="sendButton" class="send-button" title="Send message">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="status-bar" id="statusBar">
+      Ready
+    </div>
+  </div>
+  
+  <script src="chat.js"></script>
+</body>
+</html>

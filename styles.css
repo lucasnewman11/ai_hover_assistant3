@@ -1,0 +1,66 @@
+.claude-assistant-container {
+  position: fixed;
+  top: 50px;
+  right: 20px;
+  width: 400px;
+  height: 600px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.claude-assistant-container.hidden {
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.claude-assistant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #8C55FB;
+  color: white;
+  cursor: move;
+}
+
+.claude-assistant-title {
+  font-weight: bold;
+}
+
+.claude-assistant-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+#claude-assistant-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  allow: microphone;
+}
+
+.audio-visualization {
+  height: 60px;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.audio-bar {
+  width: 3px;
+  margin: 0 2px;
+  background-color: #8C55FB;
+  border-radius: 3px;
+}

@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Conversation",
+  "version": "1.0",
+  "description": "Chat with Claude directly from your browser with voice support",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "audioCapture"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["env.js", "claude-service.js", "content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [".env", "env.js", "chat.html", "chat.js", "claude-service.js", "mic-test.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

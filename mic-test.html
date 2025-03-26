@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microphone Access Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      text-align: center;
+    }
+    button {
+      background-color: #8C55FB;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px;
+    }
+    #status {
+      margin: 20px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    .error {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+    .canvas-container {
+      width: 100%;
+      height: 100px;
+      background-color: #f5f5f5;
+      margin: 20px 0;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Microphone Access Test</h1>
+  <p>This page tests if your browser can access the microphone.</p>
+  
+  <button id="testMic">Test Microphone Access</button>
+  <button id="testRecord">Test Recording</button>
+  
+  <div id="status">Status will appear here</div>
+  
+  <div class="canvas-container">
+    <canvas id="visualizer" width="600" height="100"></canvas>
+  </div>
+  
+  <script>
+    const testMicButton = document.getElementById('testMic');
+    const testRecordButton = document.getElementById('testRecord');
+    const statusDiv = document.getElementById('status');
+    const canvas = document.getElementById('visualizer');
+    const canvasCtx = canvas.getContext('2d');
+    const canvasContainer = document.querySelector('.canvas-container');
+    
+    let mediaRecorder;
+    let audioChunks = [];
+    let audioContext;
+    let analyser;
+    let source;
+    let animationId;
+    let stream;
+    
+    testMicButton.addEventListener('click', async () => {
+      statusDiv.className = '';
+      statusDiv.textContent = 'Requesting microphone access...';
+      
+      try {
+        // Request microphone access
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        statusDiv.className = 'success';
+        statusDiv.textContent = 'Microphone access granted! You can now test recording.';
+        
+        // Setup audio visualization
+        setupVisualization(stream);
+        
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+        statusDiv.className = 'error';
+        statusDiv.textContent = `Error: ${error.message}. Make sure you've granted microphone permissions.`;
+      }
+    });
+    
+    testRecordButton.addEventListener('click', async () => {
+      if (!stream) {
+        statusDiv.className = 'error';
+        statusDiv.textContent = 'Please test microphone access first.';
+        return;
+      }
+      
+      if (!mediaRecorder) {
+        // Start recording
+        startRecording();
+        testRecordButton.textContent = 'Stop Recording';
+      } else {
+        // Stop recording
+        stopRecording();
+        testRecordButton.textContent = 'Test Recording';
+      }
+    });
+    
+    function setupVisualization(stream) {
+      // Show the canvas
+      canvasContainer.style.display = 'block';
+      
+      // Create audio context
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      source = audioContext.createMediaStreamSource(stream);
+      
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      
+      // Start visualization
+      visualize();
+    }
+    
+    function visualize() {
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      function draw() {
+        animationId = requestAnimationFrame(draw);
+        
+        analyser.getByteFrequencyData(dataArray);
+        
+        canvasCtx.fillStyle = '#f5f5f5';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let barHeight;
+        let x = 0;
+        
+        for (let i = 0; i < bufferLength; i++) {
+          barHeight = dataArray[i] / 2;
+          
+          canvasCtx.fillStyle = `rgb(${barHeight + 100}, 50, 200)`;
+          canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+          
+          x += barWidth + 1;
+        }
+      }
+      
+      draw();
+    }
+    
+    function startRecording() {
+      if (!stream) return;
+      
+      // Clear previous recordings
+      audioChunks = [];
+      
+      // Create MediaRecorder
+      mediaRecorder = new MediaRecorder(stream);
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Create audio element to play back recording
+        const audio = document.createElement('audio');
+        audio.src = audioUrl;
+        audio.controls = true;
+        
+        // Add to page
+        document.body.appendChild(audio);
+        
+        statusDiv.className = 'success';
+        statusDiv.textContent = 'Recording successful! You can play it back below.';
+      };
+      
+      // Start recording
+      mediaRecorder.start();
+      statusDiv.className = '';
+      statusDiv.textContent = 'Recording... Click "Stop Recording" when done.';
+    }
+    
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder = null;
+      }
+    }
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+      
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
+      if (audioContext) {
+        audioContext.close();
+      }
+    });
+  </script>
+</body>
+</html>
