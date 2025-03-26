@@ -793,7 +793,24 @@ chatInput.addEventListener('keypress', (event) => {
 // Setup the audio visualization
 function setupAudioVisualization() {
   // Clear existing bars
-  audioVisualization.innerHTML = '';
+  audioVisualization.innerHTML = `
+    <div class="audio-controls">
+      <button id="cancelRecordingButton" class="audio-control-button" title="Cancel recording">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+        </svg>
+      </button>
+      <div class="recording-status">Recording...</div>
+      <button id="stopRecordingButton" class="audio-control-button" title="Stop recording and send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <rect x="9" y="9" width="6" height="6"></rect>
+        </svg>
+      </button>
+    </div>
+  `;
   
   // Create bars for visualization
   for (let i = 0; i < 50; i++) {
@@ -802,6 +819,10 @@ function setupAudioVisualization() {
     bar.style.height = '3px';
     audioVisualization.appendChild(bar);
   }
+  
+  // Add event listeners for the new buttons
+  document.getElementById('stopRecordingButton').addEventListener('click', stopRecording);
+  document.getElementById('cancelRecordingButton').addEventListener('click', cancelRecording);
 }
 
 // Update the audio visualization
@@ -851,9 +872,13 @@ async function startRecording() {
     
     try {
       mediaRecorder = new MediaRecorder(stream, options);
+      // Store the stream in the mediaRecorder for later access
+      mediaRecorder.stream = stream;
     } catch (e) {
       console.log('MediaRecorder not supported with these options, trying without options');
       mediaRecorder = new MediaRecorder(stream);
+      // Store the stream in the mediaRecorder for later access
+      mediaRecorder.stream = stream;
     }
     
     audioChunks = [];
@@ -1147,6 +1172,54 @@ async function startRecordingFallback() {
     // Show a message to the user
     addMessageToChat("I couldn't access your microphone. Please make sure your browser allows microphone access and try again.", 'assistant');
   }
+}
+
+// Function to cancel recording without processing audio
+function cancelRecording() {
+  console.log('Recording cancelled');
+  
+  if (mediaRecorder && isRecording) {
+    // Stop recording but don't process
+    mediaRecorder.ondataavailable = null; // Remove handler
+    mediaRecorder.onstop = null; // Remove handler
+    mediaRecorder.stop();
+    
+    // Stop the stream tracks
+    if (mediaRecorder.stream) {
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+  }
+  
+  // If using fallback method
+  if (window.recordingStream && isRecording) {
+    // Stop microphone access
+    window.recordingStream.getTracks().forEach(track => track.stop());
+    
+    // Disconnect and clean up the audio processor
+    if (window.audioProcessor) {
+      window.audioProcessor.disconnect();
+    }
+    
+    // Clean up
+    window.audioDataArray = [];
+    window.audioProcessor = null;
+    window.recordingStream = null;
+  }
+  
+  // Reset UI
+  isRecording = false;
+  audioChunks = [];
+  
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  
+  // Hide visualization
+  audioVisualization.style.display = 'none';
+  voiceButton.classList.remove('recording');
+  
+  updateStatus('Recording cancelled');
 }
 
 // Toggle recording when voice button is clicked
