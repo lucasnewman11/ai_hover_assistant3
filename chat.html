@@ -77,10 +77,19 @@
       word-break: break-word;
     }
     
-    .message-speak-button {
+    .message-playback-controls {
       position: absolute;
       top: 5px;
       right: 5px;
+      display: flex;
+      gap: 6px;
+      transition: opacity 0.2s;
+      opacity: 0;
+    }
+    
+    .message-speak-button,
+    .message-pause-button,
+    .message-restart-button {
       background: rgba(140, 85, 251, 0.2);
       border: none;
       border-radius: 50%;
@@ -90,19 +99,32 @@
       justify-content: center;
       align-items: center;
       cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.2s, background-color 0.2s;
+      transition: background-color 0.2s;
+    }
+    
+    .message-speak-button.speaking {
+      background: rgba(22, 160, 133, 0.5);
+    }
+    
+    .message-speak-button.paused {
+      background: rgba(243, 156, 18, 0.5);
     }
     
     .assistant-message {
       position: relative;
     }
     
-    .assistant-message:hover .message-speak-button {
+    .assistant-message:hover .message-playback-controls {
       opacity: 1;
     }
     
-    .message-speak-button:hover {
+    .message-playback-controls.active {
+      opacity: 1;
+    }
+    
+    .message-speak-button:hover,
+    .message-pause-button:hover,
+    .message-restart-button:hover {
       background: rgba(140, 85, 251, 0.5);
     }
     

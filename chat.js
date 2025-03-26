@@ -35,7 +35,10 @@ let messages = [
 let ttsEnabled = true;
 let ttsVoice = 'nova';
 let isSpeaking = false;
+let isPaused = false;
 let currentSpeech = null;
+let currentAudioUrl = null;
+let currentSpeechText = '';
 let speechQueue = [];
 let streamingTtsChunks = [];
 let streamingTtsTimer = null;
@@ -246,16 +249,84 @@ function addMessageToChat(content, sender, shouldSpeak = false) {
   messageText.className = 'message-text';
   messageText.textContent = content;
   
-  // Add a speak button for assistant messages
+  // Add playback controls for assistant messages
   if (sender === 'assistant') {
+    // Playback controls container
+    const playbackControls = document.createElement('div');
+    playbackControls.className = 'message-playback-controls';
+    
+    // Play/Speak button
     const speakThisButton = document.createElement('button');
     speakThisButton.className = 'message-speak-button';
     speakThisButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
     speakThisButton.title = 'Speak this message';
+    speakThisButton.dataset.messageId = Date.now().toString();
     speakThisButton.addEventListener('click', () => {
+      // Store the current message text for potential restart
+      currentSpeechText = content;
       speakText(content);
+      
+      // Show additional controls
+      playbackControls.classList.add('active');
     });
-    messageDiv.appendChild(speakThisButton);
+    
+    // Pause/Resume button - initially hidden
+    const pauseResumeButton = document.createElement('button');
+    pauseResumeButton.className = 'message-pause-button';
+    pauseResumeButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+    pauseResumeButton.title = 'Pause playback';
+    pauseResumeButton.style.display = 'none';
+    pauseResumeButton.addEventListener('click', () => {
+      togglePauseResume();
+      
+      // Update button appearance based on state
+      if (isPaused) {
+        pauseResumeButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+        pauseResumeButton.title = 'Resume playback';
+      } else {
+        pauseResumeButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+        pauseResumeButton.title = 'Pause playback';
+      }
+    });
+    
+    // Restart button - initially hidden
+    const restartButton = document.createElement('button');
+    restartButton.className = 'message-restart-button';
+    restartButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>';
+    restartButton.title = 'Restart playback';
+    restartButton.style.display = 'none';
+    restartButton.addEventListener('click', () => {
+      restartSpeech();
+    });
+    
+    // Add observer to watch for speaking state
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const target = mutation.target;
+          if (target.classList.contains('speaking')) {
+            pauseResumeButton.style.display = 'inline-flex';
+            restartButton.style.display = 'inline-flex';
+          } else {
+            setTimeout(() => {
+              pauseResumeButton.style.display = 'none';
+              restartButton.style.display = 'none';
+              playbackControls.classList.remove('active');
+            }, 500);
+          }
+        }
+      });
+    });
+    
+    // Observe the speak button for class changes
+    observer.observe(speakThisButton, { attributes: true });
+    
+    // Add controls to container
+    playbackControls.appendChild(speakThisButton);
+    playbackControls.appendChild(pauseResumeButton);
+    playbackControls.appendChild(restartButton);
+    
+    messageDiv.appendChild(playbackControls);
   }
   
   messageDiv.appendChild(messageText);
@@ -364,15 +435,34 @@ function speakTextBrowser(text) {
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
   
+  // Store current text
+  currentSpeechText = text;
+  
   // Event handlers
   utterance.onstart = () => {
     isSpeaking = true;
-    speakButton.classList.add('speaking');
+    isPaused = false;
+    
+    // Find all potential speak buttons
+    const speakButtons = document.querySelectorAll('.message-speak-button');
+    speakButtons.forEach(btn => {
+      if (btn.parentNode.parentNode.querySelector('.message-text').textContent === text) {
+        btn.classList.add('speaking');
+        btn.classList.remove('paused');
+      }
+    });
   };
   
   utterance.onend = () => {
     isSpeaking = false;
-    speakButton.classList.remove('speaking');
+    isPaused = false;
+    
+    // Find all potential speak buttons
+    const speakButtons = document.querySelectorAll('.message-speak-button');
+    speakButtons.forEach(btn => {
+      btn.classList.remove('speaking');
+      btn.classList.remove('paused');
+    });
     
     // Play next in queue if any
     if (speechQueue.length > 0) {
@@ -386,7 +476,15 @@ function speakTextBrowser(text) {
   utterance.onerror = (event) => {
     console.error('Speech synthesis error:', event);
     isSpeaking = false;
-    speakButton.classList.remove('speaking');
+    isPaused = false;
+    
+    // Reset all buttons
+    const speakButtons = document.querySelectorAll('.message-speak-button');
+    speakButtons.forEach(btn => {
+      btn.classList.remove('speaking');
+      btn.classList.remove('paused');
+    });
+    
     updateStatus('Error playing speech');
   };
   
@@ -438,15 +536,33 @@ async function speakTextOpenAI(text) {
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     
+    // Store the audio URL for restart functionality
+    currentAudioUrl = audioUrl;
+    currentSpeechText = text;
+    
     // Create and play audio
     const audio = new Audio(audioUrl);
     currentSpeech = audio;
     
+    // Find all speak buttons that could be speaking this content
+    const speakButtons = document.querySelectorAll('.message-speak-button');
+    
     audio.onended = () => {
       isSpeaking = false;
-      speakButton.classList.remove('speaking');
-      URL.revokeObjectURL(audioUrl);
+      isPaused = false;
+      
+      // Update all potential speaking buttons
+      speakButtons.forEach(btn => {
+        btn.classList.remove('speaking');
+        btn.classList.remove('paused');
+      });
+      
+      // Don't revoke URL - keep it for restart
+      // URL.revokeObjectURL(audioUrl);
+      
       currentSpeech = null;
+      // Keep currentAudioUrl and currentSpeechText for restart
+      
       updateStatus('Ready');
       
       // Play next in queue if any
@@ -486,6 +602,24 @@ async function speakTextOpenAI(text) {
 
 // Main speak function that routes to the appropriate TTS method
 function speakText(text) {
+  // Store the text being spoken
+  currentSpeechText = text;
+  
+  // Reset pause state
+  isPaused = false;
+  
+  // Mark active button as speaking
+  document.querySelectorAll('.message-speak-button').forEach(button => {
+    if (button.parentNode.parentNode.querySelector('.message-text').textContent === text) {
+      button.classList.add('speaking');
+      button.classList.remove('paused');
+    } else {
+      button.classList.remove('speaking');
+      button.classList.remove('paused');
+    }
+  });
+  
+  // Route to appropriate TTS method
   if (useBrowserTts) {
     speakTextBrowser(text);
   } else {
@@ -530,6 +664,89 @@ function resetStreamingText() {
   streamingTtsTimer = null;
 }
 
+// Pause or resume speech playback
+function togglePauseResume() {
+  if (!currentSpeech && !useBrowserTts) return;
+  
+  if (useBrowserTts) {
+    // Browser speech synthesis
+    if (isPaused) {
+      window.speechSynthesis.resume();
+      isPaused = false;
+      isSpeaking = true;
+      updateStatus('Resumed playback');
+    } else {
+      window.speechSynthesis.pause();
+      isPaused = true;
+      updateStatus('Paused playback');
+    }
+  } else {
+    // OpenAI audio
+    if (currentSpeech) {
+      if (isPaused) {
+        currentSpeech.play();
+        isPaused = false;
+        isSpeaking = true;
+        updateStatus('Resumed playback');
+      } else {
+        currentSpeech.pause();
+        isPaused = true;
+        updateStatus('Paused playback');
+      }
+    }
+  }
+  
+  // Update active button states
+  document.querySelectorAll('.message-speak-button.speaking').forEach(button => {
+    button.classList.toggle('paused', isPaused);
+  });
+}
+
+// Restart speech playback from the beginning
+function restartSpeech() {
+  if (!currentSpeechText) return;
+  
+  if (useBrowserTts) {
+    // For browser speech, just stop and start again
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    speakTextBrowser(currentSpeechText);
+  } else {
+    // For OpenAI audio, rewind to start
+    if (currentSpeech) {
+      currentSpeech.currentTime = 0;
+      
+      // If it was paused, also resume playback
+      if (isPaused) {
+        currentSpeech.play();
+        isPaused = false;
+      }
+    } else if (currentAudioUrl && currentSpeechText) {
+      // If we don't have the Audio object but have the URL, recreate it
+      const audio = new Audio(currentAudioUrl);
+      currentSpeech = audio;
+      
+      // Set up event handlers
+      audio.onended = () => {
+        isSpeaking = false;
+        document.querySelectorAll('.message-speak-button.speaking').forEach(btn => {
+          btn.classList.remove('speaking');
+        });
+        updateStatus('Ready');
+      };
+      
+      audio.play();
+      isSpeaking = true;
+    } else {
+      // If we don't have the audio at all, regenerate it
+      speakText(currentSpeechText);
+    }
+  }
+  
+  updateStatus('Restarted playback');
+}
+
 // Stop current speech
 function stopSpeaking() {
   // Stop OpenAI audio
@@ -546,9 +763,18 @@ function stopSpeaking() {
   
   // Reset state
   isSpeaking = false;
-  speakButton.classList.remove('speaking');
+  isPaused = false;
+  document.querySelectorAll('.message-speak-button.speaking').forEach(btn => {
+    btn.classList.remove('speaking');
+    btn.classList.remove('paused');
+  });
   speechQueue = [];
   resetStreamingText();
+  
+  // Keep URL for potential restart
+  // currentAudioUrl is maintained for restart functionality
+  
+  updateStatus('Stopped playback');
 }
 
 // Queue a text for speech
@@ -584,13 +810,36 @@ async function sendMessage(content) {
   responseText.className = 'message-text';
   responseText.textContent = '';
   
-  // Add a speak button
+  // Playback controls container
+  const playbackControls = document.createElement('div');
+  playbackControls.className = 'message-playback-controls';
+    
+  // Play/Speak button
   const speakThisButton = document.createElement('button');
   speakThisButton.className = 'message-speak-button';
   speakThisButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
   speakThisButton.title = 'Speak this message';
   
-  responseDiv.appendChild(speakThisButton);
+  // Pause/Resume button - initially hidden
+  const pauseResumeButton = document.createElement('button');
+  pauseResumeButton.className = 'message-pause-button';
+  pauseResumeButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+  pauseResumeButton.title = 'Pause playback';
+  pauseResumeButton.style.display = 'none';
+  
+  // Restart button - initially hidden
+  const restartButton = document.createElement('button');
+  restartButton.className = 'message-restart-button';
+  restartButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>';
+  restartButton.title = 'Restart playback';
+  restartButton.style.display = 'none';
+  
+  // Add controls to container
+  playbackControls.appendChild(speakThisButton);
+  playbackControls.appendChild(pauseResumeButton);
+  playbackControls.appendChild(restartButton);
+  
+  responseDiv.appendChild(playbackControls);
   responseDiv.appendChild(responseText);
   chatMessages.appendChild(responseDiv);
   
@@ -756,10 +1005,51 @@ async function sendMessage(content) {
       }
     }
     
-    // Add event listener to speak button once we have the complete text
+    // Add event listeners to all buttons once we have the complete text
     speakThisButton.addEventListener('click', () => {
+      currentSpeechText = fullText;
       speakText(fullText);
+      playbackControls.classList.add('active');
     });
+    
+    pauseResumeButton.addEventListener('click', () => {
+      togglePauseResume();
+      
+      // Update button appearance based on state
+      if (isPaused) {
+        pauseResumeButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+        pauseResumeButton.title = 'Resume playback';
+      } else {
+        pauseResumeButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+        pauseResumeButton.title = 'Pause playback';
+      }
+    });
+    
+    restartButton.addEventListener('click', () => {
+      restartSpeech();
+    });
+    
+    // Add observer to watch for speaking state
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const target = mutation.target;
+          if (target.classList.contains('speaking')) {
+            pauseResumeButton.style.display = 'inline-flex';
+            restartButton.style.display = 'inline-flex';
+          } else {
+            setTimeout(() => {
+              pauseResumeButton.style.display = 'none';
+              restartButton.style.display = 'none';
+              playbackControls.classList.remove('active');
+            }, 500);
+          }
+        }
+      });
+    });
+    
+    // Observe the speak button for class changes
+    observer.observe(speakThisButton, { attributes: true });
     
     // Add to messages array
     messages.push({ role: 'assistant', content: fullText });
