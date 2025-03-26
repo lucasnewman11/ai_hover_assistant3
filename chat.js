@@ -1216,5 +1216,30 @@ window.addEventListener('message', function(event) {
   }
 });
 
+// Toggle options menu
+const optionsButton = document.getElementById('optionsButton');
+const optionsMenu = document.getElementById('optionsMenu');
+
+optionsButton.addEventListener('click', () => {
+  optionsMenu.classList.toggle('show');
+});
+
+// Close options menu when clicking outside
+document.addEventListener('click', (event) => {
+  if (!optionsButton.contains(event.target) && !optionsMenu.contains(event.target)) {
+    optionsMenu.classList.remove('show');
+  }
+});
+
+// Close the options menu after selecting an option
+document.querySelectorAll('.option-button').forEach(button => {
+  button.addEventListener('click', () => {
+    // Small delay to allow the visual feedback of the button click
+    setTimeout(() => {
+      optionsMenu.classList.remove('show');
+    }, 150);
+  });
+});
+
 // Load configuration on page load
 window.addEventListener('DOMContentLoaded', loadConfig);
