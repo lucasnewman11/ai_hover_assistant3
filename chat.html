@@ -87,16 +87,12 @@
       gap: 6px;
       transition: opacity 0.2s;
       opacity: 0;
-      background: white;
-      padding: 6px;
-      border-radius: 6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
     .message-speak-button,
     .message-pause-button,
     .message-restart-button {
-      background: rgba(140, 85, 251, 0.2);
+      background: rgba(140, 85, 251, 0.4); /* Slightly more opaque */
       border: none;
       border-radius: 50%;
       width: 28px;
@@ -116,11 +112,11 @@
     }
     
     .message-speak-button.speaking {
-      background: rgba(22, 160, 133, 0.5);
+      background: rgba(22, 160, 133, 0.6); /* Green for active */
     }
     
     .message-speak-button.paused {
-      background: rgba(243, 156, 18, 0.5);
+      background: rgba(243, 156, 18, 0.6); /* Orange for paused */
     }
     
     .assistant-message {
@@ -145,7 +141,7 @@
     .message-speak-button:hover,
     .message-pause-button:hover,
     .message-restart-button:hover {
-      background: rgba(140, 85, 251, 0.5);
+      background: rgba(140, 85, 251, 0.7); /* Darker on hover */
     }
     
     .typing-indicator {
