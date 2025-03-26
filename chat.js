@@ -793,24 +793,32 @@ chatInput.addEventListener('keypress', (event) => {
 // Setup the audio visualization
 function setupAudioVisualization() {
   // Clear existing bars
-  audioVisualization.innerHTML = `
-    <div class="audio-controls">
-      <button id="cancelRecordingButton" class="audio-control-button" title="Cancel recording">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="9" y1="9" x2="15" y2="15"></line>
-          <line x1="15" y1="9" x2="9" y2="15"></line>
-        </svg>
-      </button>
-      <div class="recording-status">Recording...</div>
-      <button id="stopRecordingButton" class="audio-control-button" title="Stop recording and send">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <rect x="9" y="9" width="6" height="6"></rect>
-        </svg>
-      </button>
-    </div>
+  audioVisualization.innerHTML = '';
+  
+  // Add control buttons
+  const muteButton = document.createElement('button');
+  muteButton.id = 'muteRecordingButton';
+  muteButton.className = 'audio-control-button';
+  muteButton.title = 'Mute microphone';
+  muteButton.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+      <line x1="8" y1="10" x2="16" y2="10"></line>
+    </svg>
   `;
+
+  const stopButton = document.createElement('button');
+  stopButton.id = 'stopRecordingButton';
+  stopButton.className = 'audio-control-button';
+  stopButton.title = 'Stop recording and process';
+  stopButton.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="6" width="12" height="12" rx="1"></rect>
+    </svg>
+  `;
+  
+  audioVisualization.appendChild(muteButton);
+  audioVisualization.appendChild(stopButton);
   
   // Create bars for visualization
   for (let i = 0; i < 50; i++) {
@@ -821,8 +829,8 @@ function setupAudioVisualization() {
   }
   
   // Add event listeners for the new buttons
-  document.getElementById('stopRecordingButton').addEventListener('click', stopRecording);
-  document.getElementById('cancelRecordingButton').addEventListener('click', cancelRecording);
+  stopButton.addEventListener('click', stopRecording);
+  muteButton.addEventListener('click', toggleMicrophoneMute);
 }
 
 // Update the audio visualization
@@ -833,7 +841,10 @@ function updateAudioVisualization() {
   const dataArray = new Uint8Array(bufferLength);
   analyser.getByteFrequencyData(dataArray);
   
-  const bars = audioVisualization.children;
+  // Get all bar elements - skip the buttons
+  const allElements = Array.from(audioVisualization.children);
+  const bars = allElements.filter(el => el.className === 'audio-bar');
+  
   const step = Math.floor(bufferLength / bars.length);
   
   for (let i = 0; i < bars.length; i++) {
@@ -1174,52 +1185,70 @@ async function startRecordingFallback() {
   }
 }
 
-// Function to cancel recording without processing audio
-function cancelRecording() {
-  console.log('Recording cancelled');
+// Variable to track mute state
+let isMicrophoneMuted = false;
+
+// Toggle microphone mute/unmute during recording
+function toggleMicrophoneMute() {
+  const muteButton = document.getElementById('muteRecordingButton');
   
-  if (mediaRecorder && isRecording) {
-    // Stop recording but don't process
-    mediaRecorder.ondataavailable = null; // Remove handler
-    mediaRecorder.onstop = null; // Remove handler
-    mediaRecorder.stop();
+  if (mediaRecorder && mediaRecorder.stream) {
+    // Toggle mute state of all audio tracks
+    const audioTracks = mediaRecorder.stream.getAudioTracks();
     
-    // Stop the stream tracks
-    if (mediaRecorder.stream) {
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    if (audioTracks.length > 0) {
+      isMicrophoneMuted = !isMicrophoneMuted;
+      
+      audioTracks.forEach(track => {
+        track.enabled = !isMicrophoneMuted;
+      });
+      
+      // Update UI
+      if (isMicrophoneMuted) {
+        muteButton.classList.add('muted');
+        muteButton.title = 'Unmute microphone';
+        muteButton.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <line x1="5" y1="10" x2="19" y2="10"></line>
+          </svg>
+        `;
+        updateStatus('Microphone muted');
+      } else {
+        muteButton.classList.remove('muted');
+        muteButton.title = 'Mute microphone';
+        muteButton.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <line x1="8" y1="10" x2="16" y2="10"></line>
+          </svg>
+        `;
+        updateStatus('Microphone unmuted');
+      }
+    }
+  } else if (window.recordingStream) {
+    // Handle muting for fallback recording
+    const audioTracks = window.recordingStream.getAudioTracks();
+    
+    if (audioTracks.length > 0) {
+      isMicrophoneMuted = !isMicrophoneMuted;
+      
+      audioTracks.forEach(track => {
+        track.enabled = !isMicrophoneMuted;
+      });
+      
+      // Update UI
+      if (isMicrophoneMuted) {
+        muteButton.classList.add('muted');
+        muteButton.title = 'Unmute microphone';
+        updateStatus('Microphone muted');
+      } else {
+        muteButton.classList.remove('muted');
+        muteButton.title = 'Mute microphone';
+        updateStatus('Microphone unmuted');
+      }
     }
   }
-  
-  // If using fallback method
-  if (window.recordingStream && isRecording) {
-    // Stop microphone access
-    window.recordingStream.getTracks().forEach(track => track.stop());
-    
-    // Disconnect and clean up the audio processor
-    if (window.audioProcessor) {
-      window.audioProcessor.disconnect();
-    }
-    
-    // Clean up
-    window.audioDataArray = [];
-    window.audioProcessor = null;
-    window.recordingStream = null;
-  }
-  
-  // Reset UI
-  isRecording = false;
-  audioChunks = [];
-  
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-  }
-  
-  // Hide visualization
-  audioVisualization.style.display = 'none';
-  voiceButton.classList.remove('recording');
-  
-  updateStatus('Recording cancelled');
 }
 
 // Toggle recording when voice button is clicked
