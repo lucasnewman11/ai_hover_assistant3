@@ -1064,12 +1064,16 @@ async function processAudio() {
     const data = await response.json();
     
     if (data.text) {
-      // Send the transcribed text to chat
+      // Set the transcribed text in the input field
       chatInput.value = data.text.trim();
-      updateStatus('Audio transcribed successfully');
       
-      // Send the message
-      sendMessage(chatInput.value);
+      // Focus the input field to allow immediate editing
+      chatInput.focus();
+      
+      // Place cursor at the end of the text
+      chatInput.setSelectionRange(chatInput.value.length, chatInput.value.length);
+      
+      updateStatus('Audio transcribed successfully');
     } else {
       updateStatus('No speech detected in audio');
     }
