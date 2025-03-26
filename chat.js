@@ -451,6 +451,9 @@ function speakTextBrowser(text) {
         btn.classList.remove('paused');
       }
     });
+    
+    // Fire custom event to show controls
+    document.dispatchEvent(new CustomEvent('tts-start'));
   };
   
   utterance.onend = () => {
@@ -463,6 +466,9 @@ function speakTextBrowser(text) {
       btn.classList.remove('speaking');
       btn.classList.remove('paused');
     });
+    
+    // Fire custom event to hide controls
+    document.dispatchEvent(new CustomEvent('tts-end'));
     
     // Play next in queue if any
     if (speechQueue.length > 0) {
@@ -565,6 +571,9 @@ async function speakTextOpenAI(text) {
       
       updateStatus('Ready');
       
+      // Fire custom event to hide controls
+      document.dispatchEvent(new CustomEvent('tts-end'));
+      
       // Play next in queue if any
       if (speechQueue.length > 0) {
         const nextText = speechQueue.shift();
@@ -581,6 +590,9 @@ async function speakTextOpenAI(text) {
     
     await audio.play();
     updateStatus('Speaking...');
+    
+    // Fire custom event to show controls
+    document.dispatchEvent(new CustomEvent('tts-start'));
     
   } catch (error) {
     console.error('Error generating speech:', error);
@@ -1008,8 +1020,14 @@ async function sendMessage(content) {
     // Add event listeners to all buttons once we have the complete text
     speakThisButton.addEventListener('click', () => {
       currentSpeechText = fullText;
-      speakText(fullText);
+      
+      // Show the control buttons when starting playback
+      pauseResumeButton.style.display = 'inline-flex';
+      restartButton.style.display = 'inline-flex';
       playbackControls.classList.add('active');
+      
+      // Start playback
+      speakText(fullText);
     });
     
     pauseResumeButton.addEventListener('click', () => {
@@ -1029,27 +1047,37 @@ async function sendMessage(content) {
       restartSpeech();
     });
     
-    // Add observer to watch for speaking state
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-          const target = mutation.target;
-          if (target.classList.contains('speaking')) {
-            pauseResumeButton.style.display = 'inline-flex';
-            restartButton.style.display = 'inline-flex';
-          } else {
-            setTimeout(() => {
-              pauseResumeButton.style.display = 'none';
-              restartButton.style.display = 'none';
-              playbackControls.classList.remove('active');
-            }, 500);
-          }
-        }
-      });
-    });
+    // Add a listener for when audio starts
+    const handleSpeakStart = () => {
+      // Make sure buttons are visible
+      pauseResumeButton.style.display = 'inline-flex';
+      restartButton.style.display = 'inline-flex';
+      playbackControls.classList.add('active');
+    };
     
-    // Observe the speak button for class changes
-    observer.observe(speakThisButton, { attributes: true });
+    // Add a listener for when audio stops
+    const handleSpeakEnd = () => {
+      setTimeout(() => {
+        // Only hide if we're not in hover state
+        if (!playbackControls.matches(':hover')) {
+          pauseResumeButton.style.display = 'none';
+          restartButton.style.display = 'none';
+          playbackControls.classList.remove('active');
+        }
+      }, 500);
+    };
+    
+    // Add custom event listeners for audio state changes
+    document.addEventListener('tts-start', handleSpeakStart);
+    document.addEventListener('tts-end', handleSpeakEnd);
+    
+    // Make controls stay visible on hover
+    playbackControls.addEventListener('mouseenter', () => {
+      if (currentSpeechText) {
+        pauseResumeButton.style.display = 'inline-flex';
+        restartButton.style.display = 'inline-flex';
+      }
+    });
     
     // Add to messages array
     messages.push({ role: 'assistant', content: fullText });
