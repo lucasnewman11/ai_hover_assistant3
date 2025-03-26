@@ -247,7 +247,10 @@ function addMessageToChat(content, sender, shouldSpeak = false) {
   
   const messageText = document.createElement('div');
   messageText.className = 'message-text';
-  messageText.textContent = content;
+  
+  // Process and format the content
+  const formattedContent = formatMessageContent(content);
+  messageText.innerHTML = formattedContent;
   
   // Add playback controls for assistant messages
   if (sender === 'assistant') {
@@ -262,9 +265,12 @@ function addMessageToChat(content, sender, shouldSpeak = false) {
     speakThisButton.title = 'Speak this message';
     speakThisButton.dataset.messageId = Date.now().toString();
     speakThisButton.addEventListener('click', () => {
+      // Get the plain text version for TTS (without formatting)
+      const plainText = content.replace(/\*\*|__|\*|_|`|```/g, '');
+      
       // Store the current message text for potential restart
-      currentSpeechText = content;
-      speakText(content);
+      currentSpeechText = plainText;
+      speakText(plainText);
       
       // Show additional controls
       playbackControls.classList.add('active');
@@ -365,6 +371,36 @@ function determineAuthHeader(apiKey) {
   }
   
   return headers;
+}
+
+// Format message content to handle markdown-like formatting
+function formatMessageContent(content) {
+  if (!content) return '';
+  
+  // Escape HTML to prevent XSS
+  let formatted = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+  
+  // Handle newlines - convert to <br> tags
+  formatted = formatted.replace(/\n/g, '<br>');
+  
+  // Handle bold text - convert **text** or __text__ to <strong>text</strong>
+  formatted = formatted.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>');
+  
+  // Handle italic text - convert *text* or _text_ to <em>text</em>
+  formatted = formatted.replace(/(\*|_)(.*?)\1/g, '<em>$2</em>');
+  
+  // Handle code blocks - convert ```code``` to <pre><code>code</code></pre>
+  formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+  
+  // Handle inline code - convert `code` to <code>code</code>
+  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  return formatted;
 }
 
 // Initialize browser speech synthesis
@@ -952,7 +988,8 @@ async function sendMessage(content) {
             
             // Update the displayed text
             fullText += deltaText;
-            responseText.textContent = fullText;
+            const formattedText = formatMessageContent(fullText);
+            responseText.innerHTML = formattedText;
             
             // Accumulate text for streaming TTS
             accumulatedChunk += deltaText;
@@ -1019,7 +1056,10 @@ async function sendMessage(content) {
     
     // Add event listeners to all buttons once we have the complete text
     speakThisButton.addEventListener('click', () => {
-      currentSpeechText = fullText;
+      // Get the plain text version for TTS (without formatting)
+      const plainText = fullText.replace(/\*\*|__|\*|_|`|```/g, '');
+      
+      currentSpeechText = plainText;
       
       // Show the control buttons when starting playback
       pauseResumeButton.style.display = 'inline-flex';
@@ -1027,7 +1067,7 @@ async function sendMessage(content) {
       playbackControls.classList.add('active');
       
       // Start playback
-      speakText(fullText);
+      speakText(plainText);
     });
     
     pauseResumeButton.addEventListener('click', () => {
