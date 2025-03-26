@@ -71,6 +71,7 @@
       align-self: flex-start;
       background-color: #e5e5ea;
       color: #333;
+      margin-right: 40px; /* Add space for the controls */
     }
     
     .message-text {
@@ -80,11 +81,16 @@
     .message-playback-controls {
       position: absolute;
       top: 5px;
-      right: 5px;
+      right: -36px; /* Position to the right of the message */
       display: flex;
+      flex-direction: column; /* Stack buttons vertically */
       gap: 6px;
       transition: opacity 0.2s;
       opacity: 0;
+      background: white;
+      padding: 6px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
     .message-speak-button,
@@ -93,13 +99,14 @@
       background: rgba(140, 85, 251, 0.2);
       border: none;
       border-radius: 50%;
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       display: flex;
       justify-content: center;
       align-items: center;
       cursor: pointer;
       transition: background-color 0.2s;
+      margin: 0 auto; /* Center horizontally */
     }
     
     /* Make sure the additional buttons are properly displayed */
@@ -120,11 +127,18 @@
       position: relative;
     }
     
+    /* Show controls on hover */
     .assistant-message:hover .message-playback-controls {
       opacity: 1;
     }
     
+    /* Show controls when active */
     .message-playback-controls.active {
+      opacity: 1;
+    }
+    
+    /* Also show controls when hovering on the controls themselves */
+    .message-playback-controls:hover {
       opacity: 1;
     }
     
