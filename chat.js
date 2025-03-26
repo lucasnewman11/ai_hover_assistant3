@@ -89,7 +89,7 @@ async function loadApiKey() {
       const openaiMatch = envText.match(/OPENAI_API_KEY=["']([^"']+)["']/);
       if (openaiMatch && openaiMatch[1]) {
         openaiApiKey = openaiMatch[1].trim();
-        console.log('Loaded OpenAI API key from .env file');
+        console.log('Loaded OpenAI API key from .env file:', openaiApiKey.substring(0, 10) + '...');
       } else {
         console.warn('No OpenAI API key found in .env file');
       }
@@ -133,8 +133,17 @@ async function loadConfig() {
     temperatureSlider.value = items.temperature;
     temperatureValue.textContent = items.temperature;
     systemPromptInput.value = items.systemPrompt;
-    openaiApiKeyInput.value = items.openaiApiKey;
-    openaiApiKey = items.openaiApiKey;
+    
+    // If we don't have an OpenAI API key from .env, try to use the one from storage
+    if (!openaiApiKey && items.openaiApiKey) {
+      console.log('Using OpenAI API key from storage');
+      openaiApiKey = items.openaiApiKey;
+    } else if (openaiApiKey) {
+      console.log('Using OpenAI API key from .env file');
+    }
+    
+    // Update the input field with the current API key
+    openaiApiKeyInput.value = openaiApiKey || '';
     
     // Load TTS settings
     ttsEnabledCheckbox.checked = items.ttsEnabled;
@@ -143,6 +152,10 @@ async function loadConfig() {
     liveStreamModeCheckbox.checked = items.liveStreamMode;
     streamingTtsBufferSizeSlider.value = items.streamingTtsBufferSize;
     bufferSizeValueSpan.textContent = items.streamingTtsBufferSize;
+    
+    // Only update OpenAI API key input value, don't overwrite the actual key 
+    // that was loaded from .env file
+    openaiApiKeyInput.value = openaiApiKey || items.openaiApiKey;
     
     // Update variables
     ttsEnabled = items.ttsEnabled;
@@ -178,7 +191,14 @@ saveConfigButton.addEventListener('click', () => {
   };
   
   // Save variables
-  openaiApiKey = openaiApiKeyInput.value;
+  // Only update the OpenAI API key if it was changed in the input field 
+  // and is different from the one in the .env file
+  const inputApiKey = openaiApiKeyInput.value.trim();
+  if (inputApiKey && inputApiKey !== openaiApiKey) {
+    console.log('Updating OpenAI API key from user input');
+    openaiApiKey = inputApiKey;
+  }
+  
   ttsEnabled = ttsEnabledCheckbox.checked;
   ttsVoice = ttsVoiceSelect.value;
   useBrowserTts = useBrowserTtsCheckbox.checked;
@@ -378,9 +398,12 @@ function speakTextBrowser(text) {
 // Text-to-speech function using OpenAI API
 async function speakTextOpenAI(text) {
   if (!openaiApiKey) {
+    console.error('OpenAI API key is missing when trying to use TTS');
     updateStatus('OpenAI API key not set. Please configure it for text-to-speech.');
     return;
   }
+  
+  console.log('Using OpenAI API key for TTS:', openaiApiKey.substring(0, 10) + '...');  
   
   try {
     // Stop any current speech
@@ -996,9 +1019,12 @@ function writeString(view, offset, string) {
 async function processAudio() {
   try {
     if (!openaiApiKey) {
+      console.error('OpenAI API key is missing when trying to use speech recognition');
       updateStatus('Error: OpenAI API key is not set. Please configure it.');
       return;
     }
+    
+    console.log('Using OpenAI API key for speech recognition:', openaiApiKey.substring(0, 10) + '...');
     
     if (audioChunks.length === 0) {
       updateStatus('No audio recorded');
